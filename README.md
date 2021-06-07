@@ -92,7 +92,10 @@ Installation of the does not require special software but for python. and python
 
 See the [open issues](hhttps://github.com/martinbarry59/SpikeSuMNet/issues) for a list of proposed features (and known issues).
 
+## Code
 
+* Scripts golder: Contains jupyter notebooks for visualisation. Run SpikeMemNet.ipynb runs a full simulation for a 2 transitions maze
+* Pkg folder: Contains the SpikeSuMNet python code
 
 <!-- CONTRIBUTING -->
 ## Contributing
