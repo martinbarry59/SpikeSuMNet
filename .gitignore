@@ -1,0 +1,12 @@
+/*
+!.gitignore
+!/scripts
+!/pkg
+!/results
+results/*
+!/scripts/*
+!/pkg/*
+!/results/.keep
+**/*.pyc
+**/*checkpoint.py
+**/*.DS_Store
