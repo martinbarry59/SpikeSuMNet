@@ -124,5 +124,5 @@ Project Link: [https://github.com/your_username/repo_name](https://github.com/yo
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 [contributors-url]: https://github.com/martinbarry59/SpikeSuMNet/graphs/contributors
-[forks-url]: hhttps://github.com/martinbarry59/SpikeSuMNet/network/members
+[forks-url]: https://github.com/martinbarry59/SpikeSuMNet/network/members
 [issues-url]: https://github.com/martinbarry59/SpikeSuMNet/issues
