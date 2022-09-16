@@ -53,7 +53,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-SpikeSuMNet is a Surprise modulated Spiking neural network project, allowing fast and precise adapatation (learning) within volatile environments. The network implementation is based on the paper [Fast adaptive learning in volatile environment](todo.com) 
+SpikeSuMNet is a Surprise modulated Spiking neural network project, allowing fast and precise adapatation (learning) within volatile environments. The network implementation is based on the paper [Fast adaptive learning in volatile environment](https://doi.org/10.1101/2022.09.13.507727) 
 ### Built With
 
 SpikesumNet is a pytorch implemented neural network. few other libraries are used for plotting mainly
