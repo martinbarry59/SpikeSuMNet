@@ -9,7 +9,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/martinbarry59/SpikeSuMNet">
-    <img src="https://i0.wp.com/procsim.ch/wp-content/uploads/2019/12/1280px-Logo_EPFL.svg_.png?ssl=1" alt="Logo">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/f/f4/Logo_EPFL.svg" alt="Logo">
   </a>
 
   <h3 align="center">SpikeSuMNet</h3>
