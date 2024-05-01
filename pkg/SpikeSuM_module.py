@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 import network_utils
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+torch.autograd.set_detect_anomaly(True)
 
 
 class SpikeSuM(object):
@@ -34,7 +35,7 @@ class SpikeSuM(object):
         
         self.rooms_encoding = torch.zeros(
             (self.batch_size, self.number_rooms, self.input_neurons)).to(device)
-
+        
         # Neuron model
         self.tau = params["tau"]
         self.eta1 = params["eta1"]
@@ -55,8 +56,7 @@ class SpikeSuM(object):
        
 
         for i in range(self.number_rooms):
-            self.rooms_encoding[:, i, self.states[i]] = 1
-
+            self.rooms_encoding[:, i, self.states[i]] = 1.
         # Weights initialisation
         self.W = params["W"]
         if self.W is None:
@@ -75,10 +75,10 @@ class SpikeSuM(object):
             )  # Expectation of maximum neuron active at the same time
         else:
             self.A0 = (
-                sparsity
+                self.sparsity
                 * .2
                 * self.EI_neurons
-                * self.phi(torch.log(torch.cosh(1)))
+                * self.phi(torch.log(torch.cosh(torch.Tensor([1]).to(device))))
                 * (self.input_neurons / self.number_rooms)
             )
 
@@ -96,6 +96,8 @@ class SpikeSuM(object):
         self.EPSC_EI_decay = torch.zeros(
             (self.batch_size, 2, self.n_memory * self.EI_neurons)).to(device)
         self.filtered_activity = torch.zeros(
+            (self.batch_size, 2, self.n_memory * self.EI_neurons)).to(device)
+        self.filtered_activity_nohin = torch.zeros(
             (self.batch_size, 2, self.n_memory * self.EI_neurons)).to(device)
         self.filtered_theta = torch.zeros(
             self.batch_size, self.n_memory).to(device)
@@ -125,13 +127,18 @@ class SpikeSuM(object):
         self.info["Learning_rate"] = []
         self.info["readout_weights"] = self.readout_weights
         self.info["EI_spikes"] = []
-        self.info['absolute error'] = []
-        self.info['effective update'] = []
-        self.info['prediction error'] = []
-        self.info['effective update_pos'] = []
-        self.info['prediction error_pos'] = []
-        self.info['effective update_neg'] = []
-        self.info['prediction error_neg'] = []
+        self.info["weights_evolution"] = [[],[]]
+        for drives in ['PE','HD']:
+            self.info['absolute error' + drives] = []
+            self.info['effective update' + drives] = []
+            self.info['prediction error' + drives] = []
+            self.info['effective update_pos'+drives] = []
+            self.info['prediction error_pos'+drives] = []
+            self.info['effective update_neg'+drives] = []
+            self.info['prediction error_neg'+drives] = []
+            self.info['self_third' + drives] = []
+            self.info['activity' + drives] = []
+            self.info['activity_inh'+ drives] = []
     def initiate_feedback(self, random_projection=False):
         """
         Observation weight initialisation.
@@ -158,27 +165,22 @@ class SpikeSuM(object):
                         1.0 * (idx + length) / diff + memory * self.EI_neurons), ] = 2.0 / nk
         if random_projection:
             sparsify = rand(
-                self.input_neurons,
+                
+                2 * self.batch_size * self.input_neurons,
                 self.n_memory * self.EI_neurons,
                 density=self.sparsity,
                 format="csr",
             )
-            sparsify.data[:] = 1
+            sparsify.data[:] = 1.
             observation_weights = torch.rand(
                 self.batch_size,
                 2,
                 self.input_neurons,
                 self.n_memory *
-                self.EI_neurons)
-            observation_weights[0] *= sparsify.toarray().clone()
-            sparsify = rand(
-                self.input_neurons,
-                self.n_memory * self.EI_neurons,
-                density=self.sparsity,
-                format="csr",
-            )
-            sparsify.data[:] = 1
-            observation_weights[1] *= sparsify.toarray().clone()
+                self.EI_neurons).float()
+            observation_weights *= sparsify.toarray().reshape(self.batch_size, 2 , self.input_neurons,
+                self.n_memory * self.EI_neurons)
+            observation_weights = observation_weights.float()
         for i in range(2):
             self.R = self.rooms_encoding.clone()
             pop_weights = []
@@ -186,7 +188,7 @@ class SpikeSuM(object):
                 P = observation_weights[:, i, :, memory *
                                         self.EI_neurons:memory *
                                         self.EI_neurons +
-                                        self.EI_neurons].clone()
+                                        self.EI_neurons].clone().to(device)
                 readout = torch.pinverse(self.R @ P)
                 pop_weights += [torch.unsqueeze(readout, 1)]
             readout_weights += [
@@ -219,10 +221,10 @@ class SpikeSuM(object):
         Transition_hidden_space = torch.einsum(
             "bijkl,bijlm->bijkm", W_reshaped, self.readout_weights)
         Transition_one_hot_space = torch.einsum(
-            "bijkl,bmk->bijlm", Transition_hidden_space, self.R)
+            "bijkl,bmk->bijlm", Transition_hidden_space, self.R )
         T = torch.mean(Transition_one_hot_space, dim=1)  # T1 + T2 average
-        T = torch.transpose(T, 2, 3)
-        T = torch.nn.functional.normalize(T, p = 1.0, dim = 3)
+        #T = torch.transpose(T, 2, 3)
+        T = torch.nn.functional.normalize(T, p = 1.0, dim = 2)
         return T
 
     def clear_spike_train(self):
@@ -322,7 +324,16 @@ class SpikeSuM(object):
                     2,
                     3)).clone().detach()]
         self.info["T_hat"] = T_hat.clone().detach()
+    def record_weight_evolution(self):
+        self.batch_size,2, self.input_neurons, self.n_memory * self.EI_neurons
+        N = int(self.input_neurons / self.number_rooms)
+        M = int(self.input_neurons / self.number_rooms)
+        W0 = torch.mean(self.W[:,0].view(self.batch_size, self.number_rooms, N, self.number_rooms, M), dim=(0, 2, 4))
+        W1 = torch.mean(self.W[:,1].view(self.batch_size, self.number_rooms, N, self.number_rooms, M), dim=(0, 2, 4))
 
+        self.info["weights_evolution"][0] += [W0.unsqueeze(0)]
+        self.info["weights_evolution"][1] += [W1.unsqueeze(0)]
+        
     def forward(
         self, EPSC_buffer, EPSC_observation, module_inhib, learning=False
     ):
@@ -339,7 +350,7 @@ class SpikeSuM(object):
 
         return: Average weight update and commitment modulation for disinhibitory neurons
         """
-
+        
         I = (self.sign * (torch.einsum("bijk,bij->bik",
                                        self.W,
                                        EPSC_buffer) - torch.einsum("bijk,bij->bik",
@@ -353,19 +364,20 @@ class SpikeSuM(object):
         self.filtered_activity = self.filtered_activity + (1.0 / self.N) * (
             - self.filtered_activity + (self.EI_spikes  - self.FB_inhib * module_inhib) / self.A0 
         ).detach()
+        self.filtered_activity_nohin = self.filtered_activity_nohin + (1.0 / self.N) * (
+            - self.filtered_activity_nohin + (self.EI_spikes) / self.A0 
+        ).detach()
         memory_activity = torch.sum(
             self.filtered_activity, dim=1).reshape(
             self.batch_size, self.n_memory, -1)
         self.network_activity = torch.sum(memory_activity, dim=2).detach()
-        
-        self.info["Activity_P1"] += [torch.sum(self.filtered_activity[0,0])]
-        self.info["Activity_P2"] += [torch.sum(self.filtered_activity[0,1])]
+        self.info["Activity_P1"] += [torch.mean(torch.sum(self.filtered_activity_nohin[:,0],dim = 1)).cpu()]
+        self.info["Activity_P2"] += [torch.mean(torch.sum(self.filtered_activity_nohin[:,1],dim = 1)).cpu()]
         self.info["Activity"] += [self.network_activity.detach().clone()]
         
         third = self.third_factor(self.network_activity).detach()
         commitement_modulation = (third > 0 ) * (1 - 2 * (third > self.third_factor(self.theta)))
         prediction_modulation = third.detach()
-
         third = torch.unsqueeze(
             third.repeat_interleave(
                 self.EI_neurons,
@@ -385,35 +397,51 @@ class SpikeSuM(object):
             self.W -= torch.einsum("ij,bikl->bikl", self.sign, deltaW).detach()
             self.W[self.W < 0] = 0
             self.W = self.W.detach()
-        
+            if self.tosave is not None:
+                self.save_drives(third, deltaW)
         self.output = torch.sum(EPSC_EI, dim = 1).detach() / 2
         self.input = self.network_activity .detach()
-        self.save_drives(third, deltaW)
+        self.record_weight_evolution()
         
         return prediction_modulation, commitement_modulation
     
     def save_drives(self,third,deltaW):
     ## Prediction error Drive 
         if self.batch_size == 1:
-            if self.tosave == 'PE':
-                self.info['effective update'] += [torch.mean((third * torch.abs(self.h)).detach().clone(),axis=1)]
-                self.info['prediction error'] += [torch.mean(torch.abs(self.h).detach().clone(),axis=1)]
-                self.info['effective update_pos'] += [(third[0,0] * torch.abs(self.h[0,0])).detach().clone()]
-                self.info['prediction error_pos'] += [torch.abs(self.h[0,0]).detach().clone()]
-                self.info['effective update_neg'] += [(third[0,1] * torch.abs(self.h[0,1])).detach().clone()]
-                self.info['prediction error_neg'] += [torch.abs(self.h[0,1]).detach().clone()]
-            ## Hebbian Drive
-            if self.tosave == 'HD':
-                Hebbian_drive = torch.einsum(
-                           "bij,bik->bijk",
-                           self.filtered_EPSC,
-                           self.h)
-                self.info['effective update'] += [torch.abs(deltaW[Hebbian_drive != 0].detach().clone()).cpu()]
-                self.info['prediction error'] += [torch.abs(Hebbian_drive[Hebbian_drive != 0]).detach().clone().cpu()]
-                self.info['effective update_pos'] += [torch.abs(deltaW[0,0][Hebbian_drive[0,0] != 0]).detach().clone().cpu()]
-                self.info['prediction error_pos'] += [torch.abs(Hebbian_drive[0,0][Hebbian_drive[0,0] != 0]).detach().clone().cpu()]
-                self.info['effective update_neg'] += [torch.abs(deltaW[0,1][Hebbian_drive[0,1] != 0]).detach().clone().cpu()]
-                self.info['prediction error_neg'] += [torch.abs(Hebbian_drive[0,1][Hebbian_drive[0,1] != 0]).detach().clone().cpu()]
+            for drives in ['PE','HD']:
+                if drives == 'PE':
+                    third_per_memory = torch.mean(third, axis = 1).reshape(-1,self.n_memory, self.EI_neurons).clone().detach()
+                    third_per_memory = torch.mean(third_per_memory, axis = -1)
+                    activity_per_memory = torch.sum(self.filtered_activity, axis = 1).reshape(-1,self.n_memory, self.EI_neurons)
+                    activity_per_memory = torch.sum(activity_per_memory, axis = -1)
+                    activity_per_memory_nohin = torch.sum(self.filtered_activity_nohin, axis = 1).reshape(-1,self.n_memory, self.EI_neurons)
+                    activity_per_memory_nohin = torch.sum(activity_per_memory_nohin, axis = -1)
+
+                    for memory in range(self.n_memory):
+#                         tmp_third = third_per_memory.clone().detach()
+                        self.info['self_third' + drives] += [third_per_memory[0,memory].clone().detach()]
+                        self.info['activity' + drives] += [activity_per_memory[0,memory].clone().detach()]
+#                         tmp_third[0,memory] *= 0
+                        self.info['activity_inh'+ drives] += [activity_per_memory_nohin[0,memory].clone().detach()]
+                    self.info['effective update'+drives] += [torch.mean((third * torch.abs(self.h)).detach().clone(),axis=1)]
+                    self.info['prediction error'+drives] += [torch.mean(torch.abs(self.h).detach().clone(),axis=1)]
+#                     self.info['effective update_pos'+drives] += [(third[0,0] * torch.abs(self.h[0,0])).detach().clone()]
+#                     self.info['prediction error_pos'+drives] += [torch.abs(self.h[0,0]).detach().clone()]
+#                     self.info['effective update_neg'+drives] += [(third[0,1] * torch.abs(self.h[0,1])).detach().clone()]
+#                     self.info['prediction error_neg'+drives] += [torch.abs(self.h[0,1]).detach().clone()]
+                ## Hebbian Drive
+                if drives == 'HD':
+                    Hebbian_drive = torch.einsum(
+                               "bij,bik->bijk",
+                               self.filtered_EPSC,
+                               self.h)
+#                     self.info['effective update'+drives] += [torch.abs(deltaW[Hebbian_drive != 0].detach().clone()).cpu()]
+#                     self.info['prediction error'+drives] += [torch.abs(Hebbian_drive[Hebbian_drive != 0]).detach().clone().cpu()]
+                    self.info['effective update_pos'+drives] += [torch.abs(deltaW[0,0][Hebbian_drive[0,0] != 0]).detach().clone().cpu()]
+                    self.info['prediction error_pos'+drives] += [torch.abs(Hebbian_drive[0,0][Hebbian_drive[0,0] != 0]).detach().clone().cpu()]
+                    self.info['effective update_neg'+drives] += [torch.abs(deltaW[0,1][Hebbian_drive[0,1] != 0]).detach().clone().cpu()]
+                    self.info['prediction error_neg'+drives] += [torch.abs(Hebbian_drive[0,1][Hebbian_drive[0,1] != 0]).detach().clone().cpu()]
+                    
                 
     def plot_network(self):
         """

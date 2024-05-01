@@ -281,6 +281,7 @@ class Selector_module(object):
         if learning:
 
             commitement_modulation = commitement_modulation.repeat_interleave(self.msp_neurons, 1).detach()
+            
             self.commitment_matrix += (self.lr_msp *
                                        torch.einsum("bj,bk->bjk", self.msp_spikes, commitement_modulation *
                                                     self.inhibitory_msp_spikes) -

@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import plotly
 import math
 import plotly.graph_objects as go
-
+import random
+import numpy as np
 ## Environment function functions ##
 def create_trans_matrix(maze, movements_list, symmetric=False):
     """
@@ -43,10 +44,11 @@ def create_move_list(len_maze, number_of_move):
             movements_list[2 * i : 2 * i + 2] = [moves[i], -moves[i]]
         ## if only more than 2 moves chose randomly a new direction
         else:
-            possible_move = [x for x in range(1, len_maze) if x not in movements_list]
+            possible_move = [x for x in range(1, int(len_maze / 2)) if x not in movements_list]
             new_move = random.choice(possible_move)
             movements_list[2 * i : 2 * i + 2] = [new_move, -new_move]
-    
+    if number_of_move == 0:
+        movements_list = [1]
     return movements_list
 
 
@@ -88,7 +90,6 @@ def draw_new_room(T, x):
     """
     CDF = torch.cumsum(T[x],dim=0)
     test = torch.rand(1)
-
     return torch.argmax(((CDF - test) > 0).float())
 
 
@@ -192,14 +193,17 @@ def create_simulation(
     simulation["change_points"] = {}
     simulation["change_points"][0] = 0
     new_room = torch.tensor(0)
+    
     maze = 0
-    simulation["rooms"] = [new_room]
+    simulation["rooms"] = []
     simulation["maze"] = [maze]
     current_maze = 0
 
     deter_switch_max_step = epochs if deter_start is None else deter_start["tend"]
     maze_presentations = {}
+    torch.manual_seed(random.randint(0,1e8))
     for epoch in range(epochs):
+        
         N_mazes = (
             len(mazes)
             if deter_start is None
@@ -246,7 +250,6 @@ def create_simulation(
                 simulation["mazes"] = mazes
                 simulation["transitions"] += [mazes.copy()]
                 mazes = draw_Dirichlet_maze(len(mazes[0]), Dirichlet)
-
         simulation["rooms"] += [new_room]
         simulation["maze"] += [maze]
 

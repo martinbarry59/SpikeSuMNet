@@ -1,5 +1,3 @@
-import torch
-
 def square_EPSC(EPSC_decay, len_epsc, spike_train=None):
     """
     Computation of the exicatory post synaptic current for every neurons
