@@ -1,8 +1,7 @@
 import torch
 import network_utils
 import tqdm
-import SpikeSuM_module as SpikeSuM
-import selector_module as sm
+import matplotlib.pyplot as plt
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def init_agent(simulation_data, network):
     """
@@ -43,7 +42,7 @@ def pre_step(simulation_data, network,simulations, epoch):
     for b in range(network.batch_size):
         buffer, obs, maze = network_utils.batch_spikes(simulations[b], epoch, network)
         simulation_data['observation_spikes'][b] = obs.clone()
-
+        
         simulation_data['buffer_spikes'][b] = buffer.clone()
         simulation_data['mazes'][b] = maze
         simulation_data['Transitions'][b] = torch.unsqueeze(
@@ -105,7 +104,7 @@ def pre_step(simulation_data, network,simulations, epoch):
     
     
     if torch.mean(torch.Tensor([simulation_data['criteria'][b]['stop']
-                    for b in range(network.batch_size)])) > 0.5:
+                    for b in range(network.batch_size)])) > 1:
         print('TOO many simulations failed end of simulation', file=network.f)
         return simulation_data['criteria'], epoch
     
@@ -184,7 +183,7 @@ def print_presentation_summary(means, simulation_data, network, simulations, epo
             print(simulations[context]["rooms"][epoch].item(), simulations[context]["rooms"][epoch+1].item(),
                 torch.mean(torch.cat(means['mean_input']),axis=0),
                 'Threshold: ',torch.mean(torch.cat(means['mean_input_']),axis=0))
-        
+
 def presentation_to_agent(simulation_data, network, simulations, epoch):
     """
     Presentation of stimulus to the network and updates
@@ -204,42 +203,45 @@ def presentation_to_agent(simulation_data, network, simulations, epoch):
     means['mean_update'] = []
     means['mean_input'] = []
     means['mean_input_'] = []
+    
     for t in range(network.T_pres):
             
-            EPSC_buffer, simulation_data['EPSC_buffer_decay'] = network_utils.square_EPSC(
-                simulation_data['EPSC_buffer_decay'],
-                network.len_epsc,
-                simulation_data['buffer_spikes'][:, :, :, t].clone(),
-            )
-            EPSC_observation, simulation_data['EPSC_observation_decay'] = network_utils.square_EPSC(
-                simulation_data['EPSC_observation_decay'],
-                network.len_epsc,
-                simulation_data['observation_spikes'][:, :, :, t].clone(),
-            )
-            # SpikeSuM step
-            weight_update, commitement_update = network.SpikeSuM_module.forward(
-                EPSC_buffer,
-                EPSC_observation,
-                simulation_data['memory_inhibitory_input'],
-                learning=learning,
-            )
+        EPSC_buffer, simulation_data['EPSC_buffer_decay'] = network_utils.square_EPSC(
+            simulation_data['EPSC_buffer_decay'],
+            network.len_epsc,
+            simulation_data['buffer_spikes'][:, :, :, t].clone(),
+        )
+        EPSC_observation, simulation_data['EPSC_observation_decay'] = network_utils.square_EPSC(
+            simulation_data['EPSC_observation_decay'],
+            network.len_epsc,
+            simulation_data['observation_spikes'][:, :, :, t].clone(),
+        )
+        # SpikeSuM step
+        weight_update, commitement_update = network.SpikeSuM_module.forward(
+            EPSC_buffer,
+            EPSC_observation,
+            simulation_data['memory_inhibitory_input'],
+            learning=learning,
+        )
 
-            dishin_input = network.SpikeSuM_module.output.clone()
-            # does the WTA only if more than one memory
-            # MSM step
-            network.selector_module.forward(
-                dishin_input, commitement_update, learning=learning
-            )
-            simulation_data['memory_inhibitory_input'] = network.selector_module.memory_output.clone()
-            means['mean_update'] += [weight_update.detach()]
-            # save output spikes of module to send to others
-            means['mean_input'] += [network.selector_module.input.detach()]
-            means['mean_input_'] += [network.selector_module.meanput.detach()]
+        dishin_input = network.SpikeSuM_module.output.clone()
+        # does the WTA only if more than one memory
+        # MSM step
+        network.selector_module.forward(
+            dishin_input, commitement_update, learning=learning
+        )
+        simulation_data['memory_inhibitory_input'] = network.selector_module.memory_output.clone()
+        means['mean_update'] += [weight_update.detach()]
+        # save output spikes of module to send to others
+        means['mean_input'] += [network.selector_module.input.detach()]
+        means['mean_input_'] += [network.selector_module.meanput.detach()]
+    
     print_presentation_summary(means, simulation_data, network, simulations, epoch)
-    network.SpikeSuM_module.filtered_EPSC *= 0
+    #network.SpikeSuM_module.filtered_EPSC *= 0
     
     network.selector_module.info["WTA"] = [
     network.selector_module.commitment_matrix]
+    
     if epoch > 0 and network.batch_size == 1:
         simulation_data['errors_updates'][network.n_memory * (epoch - 1):network.n_memory * (
             epoch - 1) + network.n_memory] = network.SpikeSuM_module.info['error'][epoch - 1]
@@ -264,7 +266,7 @@ def run_simulation(simulations, network):
     simulation_data = initialise_simulation(simulations, network)
 
     #Running every stimulus presentation
-    for epoch in tqdm.tqdm(range(simulations[0]["epochs"]), disable=disable):
+    for epoch in tqdm.tqdm(range(simulations[0]["epochs"] - 1), disable=False):
 
         simulation_data = pre_step(simulation_data, network,simulations, epoch)
         
@@ -272,6 +274,17 @@ def run_simulation(simulations, network):
 
         if  network.f is not None:
             network.f.close()
+        if network.batch_size == 1 and epoch in [1,1000,1500,2500,5400,9869] and network.plot:
+            plt.imshow(network.SpikeSuM_module.info['T_hat'][0,0].cpu().T)
+            plt.axis('off')
+            plt.savefig('estimation_epoch_{}'.format(epoch))
+            
+            plt.show()
+            plt.imshow(simulation_data['Transitions'][0,0].cpu().T)
+            plt.axis('off')
+            plt.savefig('truth_epoch_{}'.format(epoch))
+            
+            plt.show()
     if network.batch_size == 1 and network.SpikeSuM_module.tosave is not None:
         for key in ['','_neg','_pos']:
             network.SpikeSuM_module.info['effective update'+key] = torch.cat(network.SpikeSuM_module.info['effective update'+key]).flatten()

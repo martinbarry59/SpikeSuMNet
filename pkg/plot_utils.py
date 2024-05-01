@@ -1,11 +1,17 @@
-import os
 import torch
 import matplotlib.pyplot as plt
-import plotly
-import math
+import save_utils
 import plotly.graph_objects as go
 def plotly_plot(datas,legend,file = None, plot = False):
-    
+    """
+    Plot data using Plotly library.
+
+    Args:
+        datas (list): A list of data arrays to be plotted.
+        legend (list): A list of two strings representing the x-axis and y-axis labels.
+        file (str, optional): The file path to save the plot as an image. Defaults to None.
+        plot (bool, optional): Whether to display the plot. Defaults to False.
+    """    
     fig = go.Figure()
     for data in datas:
         x = torch.arange(len(data))
@@ -44,7 +50,7 @@ def plotly_plot(datas,legend,file = None, plot = False):
     )
 )
     if file:
-        save(data = fig, file = file, type_= 'fig_ly')
+        save_utils.save(data = fig, file = file, type_= 'fig_ly')
     if plot:
         fig.show()
 
@@ -79,7 +85,7 @@ def print_values(tensor,name,percentage = 1):
     mean = scaling * torch.mean(tensor)
     std = torch.std(tensor)/torch.sqrt(torch.tensor([len(tensor)])) * scaling
     print(name,mean.item(),'$\pm$', std.item())
-    
+
 def print_criteria(path):
     """
     Path:  path to the file where the criteria are saved
@@ -101,7 +107,19 @@ def print_criteria(path):
 
 
 def plot_spike_train(spikes_mat,neurons,n_memory,title = None,directory = None):
-    
+    """
+    Plots the spike train for a given set of spikes.
+
+    Parameters:
+    spikes_mat (torch.Tensor): The spike matrix of shape (n_neurons, n_time_steps).
+    neurons (int): The number of neurons to plot.
+    n_memory (int): The number of memory context.
+    title (str, optional): The title of the plot. Defaults to None.
+    directory (str, optional): The directory to save the plot. Defaults to None.
+
+    Returns:
+    None
+    """
     linewidth = 0.8
     
     event_times, event_ids = torch.where(spikes_mat.T)
@@ -111,8 +129,6 @@ def plot_spike_train(spikes_mat,neurons,n_memory,title = None,directory = None):
     left, width = 0.1, 0.65
     bottom, height = 0.1, 0.65
     spacing = 0.005
-
-
     rect_scatter = [left, bottom, width, height]
     rect_histx = [left, bottom + height + spacing, width, 0.2]
     rect_histy = [left + width + spacing, bottom, 0.2, height]
@@ -146,10 +162,10 @@ def plot_spike_train(spikes_mat,neurons,n_memory,title = None,directory = None):
         ax_histy.barh(torch.arange(n_memory), sample / torch.sum(sample))
         ax_histy.yaxis.set_label_position("right")
         ax_histy.yaxis.tick_right()
-    plt.ylim([-0.45,n_memory -1 + .45])
+    plt.ylim([-0.45, n_memory -1 + .45])
     plt.show()
 
-def windowed_mean(x,y,window = 0.01):
+def windowed_mean(x,y,window = 0.01,minmax = []):
     """
     x: x axis values of the array to average
     
@@ -160,16 +176,24 @@ def windowed_mean(x,y,window = 0.01):
     return averaged x, averaged y
     
     """
-    loops = int(torch.max(x) / window)
-    test = torch.argmax(y)
-    mean_x = torch.zeros(loops)
-    mean_y = torch.zeros(loops)
+    import scipy.stats
+    if len(minmax) > 0:
+        steps = (minmax[1]-minmax[0]) / window
+        print(steps)
+    else:
+        steps = torch.max(x) / window
+    mean_x = torch.zeros(window)
+    mean_y = torch.zeros(window)
+    std_y = torch.zeros(window)
     start_value = 0
     start_idx = 0
-    for i in range(loops):        
-        indices = (start_value<x) * (x<start_value + window)
+    for i in range(window):        
+        indices = (start_value<x) * (x<(start_value + steps))
         end = len(x[indices])
-        mean_x[i] = torch.mean(x[indices])
+        m, se = torch.mean(y[indices]), scipy.stats.sem(y[indices].cpu().numpy())
+        h = se * scipy.stats.t.ppf((1 + 0.9) / 2., end-1)
         mean_y[i] = torch.mean(y[indices])
-        start_value += window
-    return mean_x, mean_y
+        std_y[i] = h#torch.std(y[indices]) 
+        mean_x[i] = torch.mean(x[indices])
+        start_value += steps
+    return mean_x, mean_y, std_y

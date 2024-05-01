@@ -21,7 +21,7 @@ class SpikeSuMC(object):
         params: Dictionnary including all network params. More details in
             results/Set_SpikeSuM-M_params.ipynb
         """
-        plot_utils.nice_print(param_networks)
+        #plot_utils.nice_print(param_networks)
         self.output = outputfile
         # Environment properties
         self.n_memory = param_networks["n_memory"]
@@ -46,9 +46,6 @@ class SpikeSuMC(object):
         self.Poisson_rate_error = param_networks["SpikeSuM_module"]["Poisson_rate_error"]
         self.len_epsc = param_networks["SpikeSuM_module"]["l"]
 
-        # Network layers
-        self.SpikeSuM_module_list = []
-        self.selector_module_list = []
 
         # Add information to parameters for other modules
         param_networks["SpikeSuM_module"]["states"] = self.states
@@ -156,7 +153,7 @@ class SpikeSuMC(object):
         param b: current batch index
         """
         error_array = self.SpikeSuM_module.info['error'][-1]
-        plot_times = [1, 500, 1000, 1500, simulation["epochs"] - 1]
+        plot_times = [1, 500, 1500, 4000, simulation["epochs"] - 1]
         if torch.argmin(error_array) == estimated_active_memory:
             self.time_good_maze += 1
         criteria[b]['count'][estimated_active_memory] += 1
@@ -192,7 +189,7 @@ class SpikeSuMC(object):
             old_memory = estimated_active_memory
             if criteria[b]['last_change_point'] > 30:
                 criteria[b]['wrong_change_point'] += 1
-        if self.batch_size <= 2 and (epoch in plot_times or epoch % 100 == 0):
+        if self.batch_size < 2 and (epoch in plot_times or epoch % 100 == 0) and self.plot:
             self.plot_network(epoch)
 
         return old_memory
