@@ -53,10 +53,10 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-SpikeSuMNet is a Surprise modulated Spiking neural network project, allowing fast and precise adapatation (learning) within volatile environments. The network implementation is based on the paper [Fast adaptive learning in volatile environment](https://doi.org/10.1101/2022.09.13.507727) 
+SpikeSuMNet is a Surprise modulated Spiking neural network project, allowing fast and precise adaptation (learning) within volatile environments. The network implementation is based on the paper [Fast adaptive learning in volatile environment](https://doi.org/10.1101/2022.09.13.507727) 
 ### Built With
 
-SpikesumNet is a pytorch implemented neural network. few other libraries are used for plotting mainly
+SpikesumNet is a pytorch-implemented neural network. few other libraries are used for plotting mainly
 
 * [Pytorch](https://pytorch.org/)
 * [scipy](https://www.scipy.org/)
@@ -69,12 +69,12 @@ SpikesumNet is a pytorch implemented neural network. few other libraries are use
 <!-- GETTING STARTED -->
 ## Getting Started
 
-Installation of the does not require special software but for python. and python dependencies
+Installation of the does not require special software but for Python. and python dependencies
 
 ### Prerequisites
 
 * python
-  to instal python follow the [installation guide](https://realpython.com/installing-python/)
+  to install Python follow the [installation guide](https://realpython.com/installing-python/)
 
 ### Installation
 
@@ -95,13 +95,13 @@ See the [open issues](hhttps://github.com/martinbarry59/SpikeSuMNet/issues) for 
 
 ## Code
 
-* Scripts golder: Contains jupyter notebooks for visualisation. Run SpikeMemNet.ipynb runs a full simulation for a 2 transitions maze
-* Pkg folder: Contains the SpikeSuMNet python code
+* Scripts folder: Contains Jupyter notebooks for visualization. Run SpikeMemNet.ipynb runs a full simulation for a 2 transition maze
+* Pkg folder: Contains the SpikeSuMNet Python code
 
 <!-- CONTRIBUTING -->
 ## Contributing
 
-Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Contributions are what makes the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
@@ -114,15 +114,13 @@ Contributions are what make the open source community such an amazing place to b
 <!-- CONTACT -->
 ## Contact
 
-Your Name - [@your_twitter](https://twitter.com/your_username) - email@example.com
-
-Project Link: [https://github.com/your_username/repo_name](https://github.com/your_username/repo_name)
+Project Link: [https://github.com/martinbarry59/SpikeSuMNet](https://github.com/martinbarry59/SpikeSuMNet)
 
 
 
 <!-- ACKNOWLEDGEMENTS -->
 ## Acknowledgements
-* [Swiss National Science foundation](http://www.snf.ch/en/Pages/default.aspx)
+* [Swiss National Science Foundation](http://www.snf.ch/en/Pages/default.aspx)
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
